@@ -66,11 +66,19 @@ def calcular_indicadores(nome_tabela="historico_btcusd"):
         # Formata o RSI para ter apenas 2 casas decimais na tela
         df_resultado['rsi_14'] = df_resultado['rsi_14'].round(2)
         
-        print(f"\n✅ Análise Concluída! Radar do Orquestrador 2.0:\n")
-        print(df_resultado.to_string(index=False))
+        # print(f"\n✅ Análise Concluída! Radar do Orquestrador 2.0:\n")
+        # print(df_resultado.to_string(index=False))
+
+        # --- A GRANDE MUDANÇA: Em vez de print, retornamos os dados ---
+        # Convertendo o DataFrame para uma lista de dicionários nativa do Python
+        # Transformamos o campo 'time' em string para que a API consiga ler pela web
+        df_resultado['time'] = df_resultado['time'].astype(str)
+        
+        return df_resultado.to_dict(orient="records")
             
     except Exception as e:
         print(f"❌ Falha crítica no processamento matemático: {e}")
+        return None
 
-if __name__ == "__main__":
-    calcular_indicadores()
+# if __name__ == "__main__":
+#     calcular_indicadores()

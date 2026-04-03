@@ -1,13 +1,14 @@
 from fastapi import FastAPI
+from backend.indicators import calcular_indicadores
 
-# Inicializa o aplicativo FastAPI
+# 1. Inicializa o aplicativo UMA ÚNICA VEZ
 app = FastAPI(
     title="API Orquestrador 2.0",
     description="Motor de Inteligência Quantitativa e Distribuição de Dados",
     version="1.0.0"
 )
 
-# Rota Raiz (O "teste de pulso" da API)
+# 2. Rota Raiz (O "teste de pulso" da API)
 @app.get("/")
 def home():
     return {
@@ -16,11 +17,27 @@ def home():
         "mensagem": "Acesso autorizado. Motor quantitativo operante."
     }
 
-# Rota de Auditoria (Para testarmos a entrega de parâmetros)
+# 3. Rota de Auditoria
 @app.get("/status/{ativo}")
 def verificar_status_ativo(ativo: str):
     return {
         "ativo": ativo.upper(),
         "monitoramento": True,
         "frequencia": "M15"
+    }
+
+# 4. Rota do Motor Quantitativo (O Prato Principal)
+@app.get("/api/v1/sinais/{ativo}")
+def obter_sinais_quantitativos(ativo: str):
+    nome_tabela = f"historico_{ativo.lower()}"
+    
+    dados_analisados = calcular_indicadores(nome_tabela)
+    
+    if dados_analisados is None:
+        return {"erro": "Falha ao processar os dados ou banco vazio."}
+        
+    return {
+        "ativo": ativo.upper(),
+        "quantidade_sinais": len(dados_analisados),
+        "sinais": dados_analisados
     }
