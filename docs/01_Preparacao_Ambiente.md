@@ -1,8 +1,3 @@
-Aqui está o material formatado. A estrutura pedagógica foi desenhada com a visão de um Tecnólogo em Análise e Desenvolvimento de Sistemas: partindo de um isolamento rigoroso da aplicação para garantir escalabilidade. 
-
-Você pode copiar o bloco de código abaixo e colar diretamente no seu arquivo `01_Preparacao_Ambiente.md` dentro da pasta `docs`.
-
-```markdown
 # Módulo 1: Construindo a Casamata - O Alicerce do Orquestrador 2.0
 
 ## 🎯 Objetivo da Aula

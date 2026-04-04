@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from backend.indicators import calcular_indicadores
 
 # 1. Inicializa o aplicativo UMA ÚNICA VEZ
@@ -6,6 +7,15 @@ app = FastAPI(
     title="API Orquestrador 2.0",
     description="Motor de Inteligência Quantitativa e Distribuição de Dados",
     version="1.0.0"
+)
+
+# --- BLOCO CRÍTICO DE CORS ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Permite qualquer origem (inclusive o localhost:5173 do Vite)
+    allow_credentials=True,
+    allow_methods=["*"], # Permite GET, POST, etc.
+    allow_headers=["*"], # Permite todos os headers
 )
 
 # 2. Rota Raiz (O "teste de pulso" da API)

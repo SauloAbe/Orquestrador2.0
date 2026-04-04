@@ -1,0 +1,21 @@
+services:
+  postgres_db:
+    # Usamos a imagem oficial do PostgreSQL (versão 15, super estável)
+    image: postgres:15
+    container_name: orquestrador_database
+    restart: always
+    
+    # Injetamos as senhas lendo diretamente do nosso arquivo oculto .env
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    
+    # Mapeamos a porta padrão do Postgres para o seu computador
+    ports:
+      - "${DB_PORT}:5432"
+    
+    # O Pulo do Gato: Salvamos os dados fisicamente na pasta que criamos
+    # Se o contêiner for destruído, os dados continuam salvos no Windows!
+    volumes:
+      - ./database/data:/var/lib/postgresql/data
