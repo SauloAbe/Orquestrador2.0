@@ -3,6 +3,7 @@ import pandas as pd
 import os
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
+import time
 
 # 1. Carrega as Variáveis de Ambiente (Segurança)
 load_dotenv()
@@ -60,6 +61,21 @@ def extrair_e_carregar(ativo="BTCUSD", timeframe=mt5.TIMEFRAME_M15, qtd_velas=10
         print(f"💾 SUCESSO! Dados salvos na tabela '{nome_tabela}' no PostgreSQL.")
     except Exception as e:
         print(f"❌ Erro ao salvar no banco de dados: {e}")
+
+    def rodar_minerador():
+        while True:
+            try:
+                # AJUSTE: Mudamos para 5m para alinhar com sua nova estratégia
+                ohlcv = exchange.fetch_ohlcv('BTC/USDT', timeframe='5m', limit=100)
+                
+                # Lógica de cálculo e salvamento no Postgres (Docker)
+                # ... (seu código de salvamento aqui) ...
+
+                print(f"[{time.strftime('%H:%M:%S')}] 💎 Mineração 5m concluída. Próxima em 60s...")
+                time.sleep(60) # Verifica atualizações a cada minuto
+            except Exception as e:
+                print(f"Erro: {e}")
+                time.sleep(10)
 
 if __name__ == "__main__":
     # Executa a função pedindo 1000 velas de 15 minutos (M15) do Bitcoin

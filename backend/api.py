@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.indicators import calcular_indicadores
+from backend.prompt_generator import gerar_prompt_analise
 
 # 1. Inicializa o aplicativo UMA ÚNICA VEZ
 app = FastAPI(
@@ -51,3 +52,17 @@ def obter_sinais_quantitativos(ativo: str):
         "quantidade_sinais": len(dados_analisados),
         "sinais": dados_analisados
     }
+
+@app.get("/api/v1/prompt/{ativo}")
+def obter_prompt_analise(ativo: str):
+    """
+    Traduz os dados do ativo em linguagem natural e retorna um prompt
+    pronto para ser colado em qualquer IA analista.
+    """
+    nome_tabela = f"historico_{ativo.lower()}"
+    resultado = gerar_prompt_analise(nome_tabela)
+ 
+    if "erro" in resultado:
+        return {"erro": resultado["erro"]}
+ 
+    return resultado
