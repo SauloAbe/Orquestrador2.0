@@ -1,54 +1,74 @@
 import os
 import pandas as pd
+import numpy as np
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 
 load_dotenv()
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_NAME = os.getenv("DB_NAME")
-DB_PORT = os.getenv("DB_PORT")
-DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@localhost:{DB_PORT}/{DB_NAME}"
+DATABASE_URL = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@localhost:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
 
-def calcular_indicadores(nome_tabela="historico_btcusd"):
+def calcular_indicadores(nome_tabela="historico_btcusd", config=None):
+    """
+    MÓDULO 10.2: Sistema de Cálculo Parametrizado.
+    Permite médias customizadas (SMA/EMA) e Bandas de Bollinger variáveis.
+    """
+    # Configuração padrão caso o objeto venha nulo
+    if config is None:
+        config = {
+            "ma1_p": 9, "ma1_t": "SMA", 
+            "ma2_p": 21, "ma2_t": "EMA", 
+            "ma3_p": 200, "ma3_t": "SMA",
+            "bb_p": 20, "bb_d": 2.0
+        }
+
     try:
         engine = create_engine(DATABASE_URL)
-        # PEGA AS ÚLTIMAS 100 VELAS (DESC) PARA TER OS DADOS ATUAIS
-        query = f"SELECT * FROM {nome_tabela} ORDER BY time DESC LIMIT 100;"
+        # Buscamos 300 velas para garantir dados para a Média de 200
+        query = f"SELECT * FROM {nome_tabela} ORDER BY time DESC LIMIT 300;"
         df = pd.read_sql(query, engine)
         
-        if df.empty or len(df) < 21:
+        if df.empty or len(df) < int(config.get('ma3_p', 200)):
             return None
 
-        # Reverte para ordem cronológica para o cálculo de médias e o gráfico
+        # Ordenar cronologicamente para cálculos de série temporal
         df = df.sort_values(by='time', ascending=True)
 
-        # SMA
-        df['sma_9'] = df['close'].rolling(window=9).mean()
-        df['sma_21'] = df['close'].rolling(window=21).mean()
-        df['tendencia'] = df.apply(lambda row: 'ALTA 🟢' if row['sma_9'] > row['sma_21'] else 'BAIXA 🔴', axis=1)
+        # --- FUNÇÃO INTERNA: CÁLCULO DE MÉDIAS MÓVEIS DINÂMICAS ---
+        def aplicar_ma(df_temp, p, tipo, label):
+            periodo = int(p)
+            if tipo == "EMA":
+                df_temp[label] = df_temp['close'].ewm(span=periodo, adjust=False).mean()
+            else:
+                df_temp[label] = df_temp['close'].rolling(window=periodo).mean()
+            return df_temp
 
-        # RSI 14
+        # Aplicando as 3 médias configuradas na Sidebar
+        df = aplicar_ma(df, config['ma1_p'], config['ma1_t'], 'sma_9')
+        df = aplicar_ma(df, config['ma2_p'], config['ma2_t'], 'sma_21')
+        df = aplicar_ma(df, config['ma3_p'], config['ma3_t'], 'sma_200')
+
+        # --- INDICADOR RSI (FIXO 14 PERÍODOS) ---
         delta = df['close'].diff()
         ganho = delta.where(delta > 0, 0)
         perda = -delta.where(delta < 0, 0)
-        media_ganho = ganho.ewm(alpha=1/14, min_periods=14).mean()
-        media_perda = perda.ewm(alpha=1/14, min_periods=14).mean()
-        rs = media_ganho / media_perda
-        df['rsi_14'] = 100 - (100 / (1 + rs))
+        mg = ganho.ewm(alpha=1/14, min_periods=14).mean()
+        mp = perda.ewm(alpha=1/14, min_periods=14).mean()
+        df['rsi_14'] = 100 - (100 / (1 + (mg / mp)))
 
-        def analisar_momentum(rsi):
-            if pd.isna(rsi): return 'NEUTRO ⚪'
-            if rsi > 70: return 'SOBRECOMPRADO ⚠️'
-            if rsi < 30: return 'SOBREVENDIDO 💥'
-            return 'NEUTRO ⚪'
+        # --- BANDAS DE BOLLINGER DINÂMICAS ---
+        bb_p = int(config.get('bb_p', 20))
+        bb_d = float(config.get('bb_d', 2.0))
+        df['bb_mid'] = df['close'].rolling(window=bb_p).mean()
+        std = df['close'].rolling(window=bb_p).std()
+        df['bb_upper'] = df['bb_mid'] + (std * bb_d)
+        df['bb_lower'] = df['bb_mid'] - (std * bb_d)
+        df['bb_pct'] = (df['close'] - df['bb_lower']) / (df['bb_upper'] - df['bb_lower'])
 
-        df['momentum'] = df['rsi_14'].apply(analisar_momentum)
+        # Formatação para o Frontend (Recharts)
         df['time'] = df['time'].astype(str)
-        
-        # Retorna os últimos 50 registros para o gráfico
-        return df.tail(50).to_dict(orient="records")
-            
+        # Remove valores nulos (NaN) para não quebrar o JSON da API
+        return df.tail(100).replace({np.nan: None}).to_dict(orient="records")
+
     except Exception as e:
-        print(f"❌ Erro: {e}")
+        print(f"❌ Erro Indicators.py: {e}")
         return None
