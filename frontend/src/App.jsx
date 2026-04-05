@@ -6,14 +6,14 @@ const INTERVALO_MS = 30000;
 function parsearRespostaIA(texto) {
   try {
     const textoLimpo = texto.replace(/```json|```/g, "").trim();
-    const match = textoLimpo.match(/\{[\s\S]*\}/);
+    const match = textoLimpo.match(/\[[\s\S]*\]/); // Agora busca um Array [ ]
     return match ? JSON.parse(match[0]) : null;
   } catch (e) { return null; }
 }
 
 function formatarValor(valor) {
-  if (valor === null || valor === undefined) return '—';
-  return Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (valor === null || valor === undefined || isNaN(valor)) return '—';
+  return Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 }
 
 function CardAnalise({ analise }) {
@@ -25,39 +25,25 @@ function CardAnalise({ analise }) {
   const estilo = config[analise.acao] || config.AGUARDAR;
 
   return (
-    <div className={`rounded-2xl border-2 ${estilo.borda} ${estilo.bg} p-6 mt-6 space-y-5 shadow-sm animate-in fade-in duration-500`}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-3xl">{estilo.icone}</span>
-          <div>
-            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Veredito da IA</p>
-            <p className="text-2xl font-black text-slate-800">{analise.acao}</p>
-          </div>
-        </div>
-        <div className="text-right">
-          <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Confiança</p>
-          <span className={`text-xs font-black px-3 py-1 rounded-full ${estilo.badge}`}>{analise.forca_sinal ?? '—'}</span>
-        </div>
+    <div className={`rounded-2xl border-2 ${estilo.borda} ${estilo.bg} p-5 space-y-4 shadow-sm`}>
+      <div className="flex justify-between items-start">
+        <span className="text-[9px] font-black bg-white border px-2 py-1 rounded text-slate-500 uppercase tracking-tighter">
+          Setup: {analise.estrategia}
+        </span>
+        <span className={`text-[10px] font-black px-2 py-1 rounded-full ${estilo.badge}`}>{analise.forca_sinal}</span>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="text-2xl">{estilo.icone}</span>
+        <h3 className="text-xl font-black text-slate-800">{analise.acao}</h3>
       </div>
       {analise.acao !== 'AGUARDAR' && (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="bg-white rounded-xl p-3 border border-slate-200 text-center font-mono">
-            <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Entrada</p>
-            <p className="text-sm font-black text-slate-800">{analise.regiao_entrada ?? '—'}</p>
-          </div>
-          <div className="bg-white rounded-xl p-3 border border-emerald-200 text-center font-mono">
-            <p className="text-[10px] uppercase font-bold text-emerald-600 mb-1">Alvo</p>
-            <p className="text-sm font-black text-emerald-700">{formatarValor(analise.alvo)}</p>
-          </div>
-          <div className="bg-white rounded-xl p-3 border border-rose-200 text-center font-mono">
-            <p className="text-[10px] uppercase font-bold text-rose-600 mb-1">Stop</p>
-            <p className="text-sm font-black text-rose-700">{formatarValor(analise.stop_loss)}</p>
-          </div>
+        <div className="grid grid-cols-1 gap-2 text-[11px] font-mono">
+          <div className="flex justify-between bg-white/50 p-2 rounded"><span>Entrada:</span> <b>{analise.regiao_entrada}</b></div>
+          <div className="flex justify-between bg-white/50 p-2 rounded text-emerald-700"><span>Alvo:</span> <b>{formatarValor(analise.alvo)}</b></div>
+          <div className="flex justify-between bg-white/50 p-2 rounded text-rose-700"><span>Stop:</span> <b>{formatarValor(analise.stop_loss)}</b></div>
         </div>
       )}
-      <div className="bg-white rounded-xl p-4 border border-slate-200">
-        <p className="text-sm text-slate-700 leading-relaxed italic">"{analise.racional}"</p>
-      </div>
+      <p className="text-[11px] text-slate-600 leading-tight italic">"{analise.racional}"</p>
     </div>
   );
 }
@@ -66,12 +52,11 @@ function PainelAnaliseIA({ ativo }) {
   const [prompt, setPrompt] = useState('');
   const [snapshot, setSnapshot] = useState(null);
   const [respostaIA, setRespostaIA] = useState('');
-  const [analise, setAnalise] = useState(() => {
+  const [analises, setAnalises] = useState(() => {
     const salva = localStorage.getItem(`analise_${ativo}`);
     return salva ? JSON.parse(salva) : null;
   });
   const [erroParser, setErroParser] = useState(false);
-  const [copiado, setCopiado] = useState(false);
   const [gerandoPrompt, setGerandoPrompt] = useState(false);
 
   const gerarPrompt = useCallback(() => {
@@ -81,21 +66,13 @@ function PainelAnaliseIA({ ativo }) {
       .then(json => {
         setPrompt(json.prompt);
         setSnapshot(json.snapshot);
-      })
-      .finally(() => setGerandoPrompt(false));
+      }).finally(() => setGerandoPrompt(false));
   }, [ativo]);
-
-  const copiarPrompt = () => {
-    navigator.clipboard.writeText(prompt).then(() => {
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 2500);
-    });
-  };
 
   const processarResposta = () => {
     const resultado = parsearRespostaIA(respostaIA);
-    if (resultado) {
-      setAnalise(resultado);
+    if (resultado && Array.isArray(resultado)) {
+      setAnalises(resultado);
       localStorage.setItem(`analise_${ativo}`, JSON.stringify(resultado));
       setErroParser(false);
     } else { setErroParser(true); }
@@ -104,39 +81,45 @@ function PainelAnaliseIA({ ativo }) {
   return (
     <section className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-          <div className="w-8 h-8 bg-violet-100 text-violet-600 rounded-lg flex items-center justify-center text-xs">AI</div>
-          Conselho Estratégico
-        </h2>
-        <div className="flex gap-2">
-          <a href="https://claude.ai" target="_blank" className="text-[9px] font-bold bg-slate-100 p-1 rounded">CLAUDE</a>
-          <a href="https://chatgpt.com" target="_blank" className="text-[9px] font-bold bg-slate-100 p-1 rounded">GPT</a>
-        </div>
+        <h2 className="text-lg font-black text-slate-800 uppercase italic tracking-tighter">Comitê de Especialistas IA</h2>
+        <button onClick={gerarPrompt} className="px-4 py-2 bg-violet-600 text-white text-xs font-bold rounded-xl hover:bg-violet-700 transition-all">
+          {gerandoPrompt ? 'Capturando Mercado...' : '⚡ Gerar Prompt Multiestratégia'}
+        </button>
       </div>
-      <button onClick={gerarPrompt} disabled={gerandoPrompt} className="w-full py-3 bg-violet-600 text-white font-bold rounded-xl shadow-lg">
-        {gerandoPrompt ? 'Capturando Dados...' : '⚡ Gerar Prompt para IA'}
-      </button>
+
       {snapshot && (
         <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-          {Object.entries(snapshot).filter(([k]) => k !== 'time').map(([key, val]) => (
-            <div key={key} className="bg-slate-50 p-2 rounded-xl text-center border border-slate-100">
+          {Object.entries(snapshot).filter(([k])=>k!=='time').map(([key, val]) => (
+            <div key={key} className="bg-slate-50 p-2 rounded-xl border border-slate-100 text-center">
               <p className="text-[8px] uppercase font-bold text-slate-400">{key}</p>
               <p className="text-xs font-black text-slate-700 font-mono">{formatarValor(val)}</p>
             </div>
           ))}
         </div>
       )}
+
       {prompt && (
-        <div className="space-y-3">
-          <textarea readOnly value={prompt} rows={3} className="w-full bg-slate-900 text-slate-400 font-mono text-[10px] p-4 rounded-xl resize-none" />
-          <button onClick={copiarPrompt} className={`w-full py-2 text-xs font-bold rounded-lg ${copiado ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-slate-300'}`}>
-            {copiado ? '✓ COPIADO' : 'COPIAR PROMPT'}
-          </button>
-          <textarea value={respostaIA} onChange={e => setRespostaIA(e.target.value)} placeholder="Cole o JSON da IA aqui..." className="w-full border-2 p-4 rounded-xl text-xs font-mono" rows={3} />
-          <button onClick={processarResposta} className="w-full py-3 bg-slate-900 text-white font-bold rounded-xl">Processar Análise →</button>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">1. Copie o Prompt</p>
+            <textarea readOnly value={prompt} className="w-full bg-slate-900 text-slate-500 font-mono text-[9px] p-3 rounded-xl h-32 resize-none" />
+            <button onClick={() => navigator.clipboard.writeText(prompt)} className="w-full py-2 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-lg hover:bg-slate-200">COPIAR TEXTO</button>
+          </div>
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">2. Cole o Resultado</p>
+            <textarea value={respostaIA} onChange={e=>setRespostaIA(e.target.value)} placeholder="Cole o JSON retornado pela IA..." className="w-full border-2 p-3 rounded-xl h-32 text-[10px] font-mono focus:border-violet-300 outline-none" />
+            <button onClick={processarResposta} className="w-full py-2 bg-slate-800 text-white text-[10px] font-bold rounded-lg hover:bg-black">PROCESSAR COMITÊ →</button>
+          </div>
         </div>
       )}
-      {analise && <CardAnalise analise={analise} />}
+
+      {erroParser && <p className="text-rose-500 text-[10px] font-bold">⚠️ Formato de resposta inválido. A IA deve retornar um Array JSON.</p>}
+
+      {analises && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+          {analises.map((item, idx) => <CardAnalise key={idx} analise={item} />)}
+        </div>
+      )}
     </section>
   );
 }
@@ -153,7 +136,7 @@ function App() {
           setDados(json.sinais);
           setUltimaAtualizacao(new Date());
         }
-      });
+      }).catch(err => console.error("Erro na API:", err));
   }, []);
 
   useEffect(() => {
@@ -163,19 +146,21 @@ function App() {
   }, [buscarDados]);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] p-4 md:p-8">
+    <div className="min-h-screen bg-[#f8fafc] p-4 md:p-8 font-sans antialiased text-slate-900">
       <header className="max-w-7xl mx-auto mb-10 flex justify-between items-end">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">Orquestrador <span className="text-blue-600">2.0</span></h1>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">PrepAção · MT5 Quant System</p>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tighter">ORQUESTRADOR <span className="text-blue-600">2.0</span></h1>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] italic">Comitê de Estratégias Quantitativas</p>
         </div>
         <div className="text-right">
-          <p className="text-[10px] font-bold text-blue-600 uppercase">● Live Terminal</p>
-          <p className="text-[10px] font-mono text-slate-400 uppercase">{ultimaAtualizacao?.toLocaleTimeString() || 'Sincronizando...'}</p>
+          <p className="text-[10px] font-bold text-emerald-500 uppercase flex items-center gap-2 justify-end">
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Terminal Live
+          </p>
+          <p className="text-[10px] font-mono text-slate-400">{ultimaAtualizacao?.toLocaleTimeString() || 'Sincronizando...'}</p>
         </div>
       </header>
-      <main className="max-w-7xl mx-auto space-y-10">
-        <section className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+      <main className="max-w-7xl mx-auto space-y-12">
+        <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
           <div className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={dados}>
@@ -193,15 +178,15 @@ function App() {
         <PainelAnaliseIA ativo="btcusd" />
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[...dados].reverse().slice(0, 6).map((s, i) => (
-            <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+            <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
               <div className="flex justify-between mb-4">
                 <span className="text-[10px] font-mono font-bold text-slate-400">{s.time.split(' ')[1]}</span>
-                <span className={`text-[10px] font-bold px-2 py-1 rounded-full text-white ${s.tendencia.includes('ALTA') ? 'bg-emerald-500' : 'bg-rose-500'}`}>{s.tendencia}</span>
+                <span className={`text-[10px] font-black px-2 py-1 rounded-full text-white ${s.tendencia.includes('ALTA') ? 'bg-emerald-500' : 'bg-rose-500'}`}>{s.tendencia}</span>
               </div>
-              <p className="text-2xl font-black text-slate-800 mb-4">{formatarValor(s.close)}</p>
+              <p className="text-2xl font-black text-slate-900 mb-4">{formatarValor(s.close)}</p>
               <div className="flex justify-between items-center text-[10px] font-bold">
                 <span className="text-blue-600">RSI: {s.rsi_14.toFixed(2)}</span>
-                <span className="bg-slate-100 p-1 rounded uppercase">{s.momentum}</span>
+                <span className="bg-slate-50 p-1 rounded uppercase">{s.momentum}</span>
               </div>
             </div>
           ))}
