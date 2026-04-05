@@ -20,10 +20,10 @@ def gerar_prompt_analise(nome_tabela: str = "historico_btcusd") -> dict:
         if df.empty or len(df) < 21:
             return {"erro": "Dados insuficientes no banco."}
 
-        # Cálculo de indicadores para o Snapshot
         df = df.sort_values(by='time', ascending=True)
         df['sma_9'] = df['close'].rolling(window=9).mean()
         df['sma_21'] = df['close'].rolling(window=21).mean()
+        
         delta = df['close'].diff()
         ganho = delta.where(delta > 0, 0)
         perda = -delta.where(delta < 0, 0)
@@ -39,7 +39,7 @@ def gerar_prompt_analise(nome_tabela: str = "historico_btcusd") -> dict:
         ativo_label = nome_tabela.replace("historico_", "").upper().replace("USD", "/USD")
 
         # ================================================================
-        # PROMPT MESTRE: COMITÊ DE 3 ESTRATÉGIAS
+        # PROMPT MESTRE CORRIGIDO: ORDEM TÉCNICA DAS ESTRATÉGIAS
         # ================================================================
         prompt = f"""Atue como um Comitê de Trading Quantitativo. Analise o ativo {ativo_label} sob 3 perspectivas distintas.
 
@@ -50,24 +50,24 @@ DADOS TÉCNICOS ATUAIS:
 
 INSTRUÇÃO: Retorne APENAS um Array JSON com 3 objetos, seguindo as diretrizes abaixo:
 
-1. ESTRATÉGIA "CONSOLIDAÇÃO": Ignore as médias. Foque no RSI e no Range (Suporte/Resistência). Busque reversões nas extremidades (comprar suporte/vender resistência).
-2. ESTRATÉGIA "TENDÊNCIA": Foque no cruzamento das médias (SMA9 vs SMA21) e no alinhamento do preço com a tendência principal.
-3. ESTRATÉGIA "SCALPER": Foque em operações ultra-rápidas, alvos curtos e alta sensibilidade ao momentum do RSI.
+1. ESTRATÉGIA "TENDÊNCIA": Foco principal em Médias Móveis (SMA9 vs SMA21) e RSI para confirmar força. O preço deve estar alinhado com a direção das médias.
+2. ESTRATÉGIA "CONSOLIDAÇÃO": Ignore as médias. Foque em Suporte e Resistência (Range 20p). Busque sinais de reversão no RSI quando o preço tocar as extremidades.
+3. ESTRATÉGIA "SCALPER": Foco em momentum de curtíssimo prazo, alvos reduzidos e alta sensibilidade à inclinação do preço.
 
 FORMATO DE RESPOSTA (JSON PURO):
 [
   {{
-    "estrategia": "CONSOLIDAÇÃO",
+    "estrategia": "TENDÊNCIA",
     "acao": "COMPRA/VENDA/AGUARDAR",
     "regiao_entrada": "valor",
     "alvo": valor,
     "stop_loss": valor,
     "risco_retorno": "1:X",
     "forca_sinal": "X%",
-    "racional": "Explicação técnica curta."
+    "racional": "Justificativa baseada nas médias e RSI."
   }},
   {{
-    "estrategia": "TENDÊNCIA",
+    "estrategia": "CONSOLIDAÇÃO",
     ...
   }},
   {{
@@ -76,7 +76,6 @@ FORMATO DE RESPOSTA (JSON PURO):
   }}
 ]
 """
-
         snapshot = {
             "preco": round(float(preco_atual), 2),
             "sma_9": round(float(ultima['sma_9']), 2),
